@@ -90,6 +90,7 @@ module AlgoliaSearch
 
     def initialize(options, &block)
       @options = options
+      @block = block
       instance_exec(&block) if block_given?
     end
 
@@ -238,6 +239,10 @@ module AlgoliaSearch
 
     def get_setting(name)
       instance_variable_get("@#{name}")
+    end
+
+    def set_instance_variable_settings(name, value)
+      instance_variable_set("@#{name}", value)
     end
 
     def to_settings
@@ -491,6 +496,21 @@ module AlgoliaSearch
 
     def algolia_without_auto_index_scope
       Thread.current["algolia_without_auto_index_scope_for_#{self.model_name}"]
+    end
+
+    def algolia_reindex_with_options!(tenant_name)
+      raise ArgumentError.new('Please provide a valid index_name.') if tenant_name.blank?
+      
+      # Update index name with new tenant settings
+      algoliasearch_settings.set_instance_variable_settings(:options, {index_name: tenant_name})
+      options =  algoliasearch_settings.get_setting(:options)
+      block = algoliasearch_settings.get_setting(:block)
+      # set configuration to nil, as it will reinitialize after algoliasearch
+      @configurations = nil
+      # reinitialize algoliasearch with new settings
+      algoliasearch(options, &block)
+      # call super method
+      algolia_reindex!
     end
 
     def algolia_reindex!(batch_size = AlgoliaSearch::IndexSettings::DEFAULT_BATCH_SIZE, synchronous = false)
